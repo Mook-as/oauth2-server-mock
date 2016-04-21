@@ -1,0 +1,14 @@
+applications:
+- name: oauth
+  stack: cflinuxfs2
+  buildpack: https://github.com/cloudfoundry/go-buildpack#v1.7.5
+  memory: 32M
+  disk_quota: 10M
+  stackato:
+    env:
+      GOPATH:
+        default: /tmp/staged/app/.heroku/go/:/tmp/staged/app/Godeps/_workspace/
+    ignores:
+    - .git
+    - bin
+    - oauth2-server

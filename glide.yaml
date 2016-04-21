@@ -1,0 +1,3 @@
+package: github.com/stackato-apps/oauth2-server-mock
+import:
+- package: github.com/dgrijalva/jwt-go

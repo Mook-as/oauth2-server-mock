@@ -1,0 +1,2 @@
+This godeps.json is only here to make the buildpack happy.
+The actual code is vendored via glide.

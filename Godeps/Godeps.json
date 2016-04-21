@@ -1,0 +1,4 @@
+{
+	"ImportPath": "github.com/stackato-apps/oauth2-server",
+	"GoVersion": "go1.6.1"
+}
