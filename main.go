@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strings"
 	"time"
 
 	jwt "github.com/dgrijalva/jwt-go"
@@ -33,21 +34,25 @@ func handleAuthEndpoint(w http.ResponseWriter, req *http.Request) {
 		<html>
 			<h1>OAuth2 authorization endpoint</h1>
 			<table>
-				<tr><th>key</th><th>value</th></tr>
-				{{range $k, $v := .}}
-					<tr><td>{{$k}}</td><td>{{$v}}</td></tr>
+				<tr><th>key<th>value
+				{{range $k, $v := .form}}
+					<tr><td>{{$k}}<td>{{$v}}
 				{{end}}
 			</table>
 			<form method="post" action="/submit">
-				<label>redirect_uri
-					<input type="text" size="100" name="redirect_uri" value="{{index .redirect_uri 0}}">
-				</label>
-				<br>
-				<label>state
-					<input type="text" size="100" name="state" value="{{index .state 0}}">
-				</label>
-				<br>
-				<input type="submit">
+				<table>
+					<tr>
+						<th>redirect_uri
+						<td><input type="text" size="100" name="redirect_uri" value="{{index .form.redirect_uri 0}}">
+					<tr>
+						<th>state
+						<td><input type="text" size="100" name="state" value="{{index .form.state 0}}">
+					<tr>
+						<th>claims
+						<td><textarea name="claims" rows="20" cols="80">{{range .claims}}{{printf "%s\n" .}}{{end}}</textarea>
+					<tr>
+						<input type="submit">
+					</tr>
 				<table>
 			</form>
 		</html>
@@ -56,8 +61,22 @@ func handleAuthEndpoint(w http.ResponseWriter, req *http.Request) {
 		writeError(w, http.StatusInternalServerError, "Erroring filling auth template", err)
 		return
 	}
+	data := map[string]interface{}{
+		"claims": []string{
+			"user_id=fake_user",
+			"user_name=Fake User",
+			"email=fake@user.invalid",
+			"extra=Extra Authenticated Value",
+		},
+		"form": req.Form,
+	}
 	w.Header().Add("Content-Type", "text/html")
-	err = tmpl.Execute(w, req.Form)
+	err = tmpl.Execute(w, data)
+	if err != nil {
+		log.Printf("Error filling template: %s\n", err.Error())
+		writeError(w, http.StatusInternalServerError, "Erroring filling auth template", err)
+		return
+	}
 }
 
 // handleSubmitEndpoint responds to /submit with a redirect to the destination
@@ -73,7 +92,7 @@ func handleSubmitEndpoint(w http.ResponseWriter, req *http.Request) {
 	}
 	query := target.Query()
 	query.Add("state", string(req.Form.Get("state")))
-	query.Add("code", "hello code")
+	query.Add("code", string(req.Form.Get("claims")))
 	target.RawQuery = query.Encode()
 	w.Header().Add("Location", target.String())
 	w.WriteHeader(http.StatusTemporaryRedirect)
@@ -86,13 +105,13 @@ func handleTokenEndpoint(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	token := jwt.New(jwt.SigningMethodHS512)
-	token.Claims = map[string]interface{}{
-		"exp":       time.Now().Add(3600 * time.Second).UTC().Unix(),
-		"user_id":   "fake_user",
-		"user_name": "Fake User",
-		"email":     "fake@user.invalid",
-		"pants":     "Authenticated Pants",
+	for _, line := range strings.Split(req.Form.Get("code"), "\n") {
+		fields := strings.SplitN(strings.TrimSpace(line), "=", 2)
+		if len(fields) == 2 {
+			token.Claims[fields[0]] = fields[1]
+		}
 	}
+	token.Claims["exp"] = time.Now().Add(3600 * time.Second).UTC().Unix()
 	signed_token, err := token.SignedString([]byte(TOKEN_SIGNING_KEY))
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "Failed to sign token: %s", err)
