@@ -126,6 +126,7 @@ func handleTokenEndpoint(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	log.Printf("JWT response: %s\n", body)
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(body)
 }
